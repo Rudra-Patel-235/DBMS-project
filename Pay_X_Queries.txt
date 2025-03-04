@@ -1,0 +1,341 @@
+-- Find Users with Multiple Bank Accounts
+
+SELECT u.FirstName, u.LastName, u.Mobile_No, COUNT(b.Account_No) AS NumOfAccounts
+FROM "User" u
+JOIN Bank b ON u.Mobile_No = b.Mobile_No
+GROUP BY u.FirstName, u.LastName, u.Mobile_No
+HAVING COUNT(b.Account_No) > 1;
+
+
+-- Calculate Average Balance in Bank Accounts for the user having multiple bank account 
+
+SELECT AVG(Balance) AS AvgBalance
+FROM (
+    SELECT b.Mobile_No, COUNT(b.Account_No) AS NumOfAccounts, SUM(b.Balance) AS Balance
+    FROM Bank b
+    GROUP BY b.Mobile_No
+    HAVING COUNT(b.Account_No) > 1
+) AS Account_info;
+
+
+-- Find Cards Expiring Within a Specified Period
+
+SELECT *
+FROM Card
+WHERE ExpiryDate BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '1 year';
+
+
+-- Retrieve Bills Paid Within a Specific Date Range 
+
+SELECT *
+FROM Bills
+WHERE BillDate BETWEEN '2023-08-01' AND '2023-11-30';
+
+
+-- Find Average Bill Amount for Each Service Provider 
+
+SELECT sp.ProviderName, AVG(b.BillAmount) AS AvgBillAmount
+FROM Bills b
+JOIN Service_Provider sp ON b.Service_No = sp.Service_No
+GROUP BY sp.ProviderName;
+
+
+-- retrieve the  rewards that are eligible for users who have made transactions in multiple categories 
+
+SELECT 
+    r.CompanyName,
+    r.Category,
+    r."Discount(%)",
+    r.CashbackRange,
+    r.Validity
+FROM 
+    Rewards r
+JOIN 
+    (
+        SELECT 
+            Mobile_No,
+            COUNT(DISTINCT th.Category) AS NumOfCategories
+        FROM 
+             User_Transaction AS ut
+        JOIN 
+            Transaction_History as th ON ut.Transaction_ID = th.Transaction_ID
+        GROUP BY 
+            ut.Mobile_No
+    ) AS tc ON r.Transaction_ID = Transaction_ID
+WHERE 
+    tc.NumOfCategories > 1;
+
+
+-- Retrieve Hotels with a Rating Higher Than the Average Rating 
+
+SELECT *
+FROM Hotels
+WHERE UserRating > (SELECT AVG(UserRating) FROM Hotels);
+
+
+-- List Hotels Offering the Widest Range of Room Types 
+
+SELECT h.*
+FROM (
+    SELECT HotelName, 
+           COUNT(DISTINCT RoomType) AS NumOfRoomTypes
+    FROM Hotels
+    GROUP BY HotelName
+    ORDER BY NumOfRoomTypes DESC
+    LIMIT 1
+) AS max_room_types
+JOIN Hotels h ON max_room_types.HotelName = h.HotelName;
+
+
+-- Retrieve Travel Services with the Lowest Price per Type 
+
+SELECT *
+FROM Travel
+WHERE (TypeNo, Price) IN (
+    SELECT TypeNo, MIN(Price)
+    FROM Travel
+    GROUP BY TypeNo
+);
+
+
+-- List Travel Services Offering Flights to Destinations with Multiple Airports 
+
+SELECT *
+FROM Travel
+WHERE TravelType = 'Flight'
+AND Destination IN (
+    SELECT Destination
+    FROM Travel
+    WHERE TravelType = 'Flight'
+    GROUP BY Destination
+    HAVING COUNT(DISTINCT "Name") > 1
+);
+
+
+-- List Travel Services Offering Flights with the Highest Number of Available Classes 
+
+SELECT *
+FROM Travel
+WHERE TravelType = 'Flight'
+AND TypeNo IN (
+    SELECT TypeNo
+    FROM Travel
+    WHERE TravelType = 'Flight'
+    GROUP BY TypeNo
+    HAVING COUNT(DISTINCT "Class") = (
+        SELECT MAX(ClassCount)
+        FROM (
+            SELECT TypeNo, COUNT(DISTINCT "Class") AS ClassCount
+            FROM Travel
+            WHERE TravelType = 'Flight'
+            GROUP BY TypeNo
+        ) AS maxCount
+    )
+);
+
+
+-- Get Mobile Plans with Unlimited Calls 
+
+SELECT *
+FROM Mobile
+WHERE Service_ID IN (
+    SELECT Service_ID
+    FROM Services
+    WHERE ServiceType = 'Recharge'
+)
+AND CallsLimit = 'Unlimited';
+
+
+-- Retrieve Mobile Recharge Services with Daily Data Usage Limit 
+
+SELECT *
+FROM Mobile
+WHERE Service_ID IN (
+    SELECT Service_ID
+    FROM Services
+    WHERE ServiceType = 'Recharge'
+)
+AND is_gb_per_day = true;
+ 
+ 
+-- Retrieve Mobile Recharge Services with the Highest Ratio of Talk Time to Price 
+
+SELECT *
+FROM Mobile
+WHERE Service_ID IN (
+    SELECT Service_ID
+    FROM Services
+    WHERE ServiceType = 'Recharge'
+)
+ORDER BY TalkTime / Amount DESC
+LIMIT 1;
+
+
+-- Find Broadband Providers Offering the Widest Range of Speeds 
+
+SELECT *
+FROM Broadband
+WHERE "Speed(mbps)" BETWEEN (
+    SELECT MIN("Speed(mbps)")
+    FROM Broadband
+) AND (
+    SELECT MAX("Speed(mbps)")
+    FROM Broadband
+);
+
+
+-- List the top 5 users who made the highest transactions
+
+SELECT U.Mobile_No, U.FirstName, U.LastName, SUM(TH.TransactionAmount) AS Total_Transaction_Amount
+FROM "User" U
+JOIN User_Transaction C ON U.Mobile_No = C.Mobile_No
+JOIN Transaction_History TH ON C.Transaction_ID = TH.Transaction_ID
+GROUP BY U.Mobile_No, U.FirstName, U.LastName
+ORDER BY Total_Transaction_Amount DESC
+LIMIT 5;
+
+
+-- Retrieve the distinct services subscribed to by a user along with their total count 
+
+SELECT U.Mobile_No, COUNT(US.Service_ID) AS Service_Count
+FROM "User" U
+LEFT JOIN User_Service US ON U.Mobile_No = US.Mobile_No
+GROUP BY U.Mobile_No;
+
+
+-- Find the total amount of bills due for each user 
+
+SELECT Mobile_No, SUM(BillAmount) AS Total_Bill_Amount
+from User_Service natural
+JOIN service_provider natural join Bills
+GROUP BY Mobile_No;
+
+
+-- Find the organizations that received donations falling within a specific amount range
+
+SELECT OrganizationName, OrganizationType, MinAmount, MaxAmount
+FROM Donations
+WHERE MinAmount >= 100 and MaxAmount <= 2000;
+
+
+-- Retrieve the service providers who offer services in multiple states 
+
+SELECT ProviderName, COUNT(DISTINCT "State") AS State_Count
+FROM Service_Provider
+GROUP BY ProviderName
+HAVING COUNT(DISTINCT "State") > 1;
+
+
+-- Retrieve the total number of transactions made on each day of the week
+
+SELECT EXTRACT(DOW FROM "Date") AS "Day", COUNT(*) AS No_Of_Transaction
+FROM Transaction_History
+GROUP BY "Day"
+ORDER BY "Day";
+
+
+-- Find the total amount spent by the user on all types of services 
+
+SELECT SUM(Total_Amount) AS Total_Spending_On_Services
+FROM (
+    SELECT SUM(H.PricePerNight) AS Total_Amount
+    FROM Hotels H
+    JOIN User_Service US ON H.Service_ID = US.Service_ID
+    WHERE US.Mobile_No = 9429416061
+    UNION ALL
+    SELECT SUM(T.Price) AS Total_Amount
+    FROM Travel T
+    JOIN User_Service US ON T.Service_ID = US.Service_ID
+    WHERE US.Mobile_No = 9429416061
+    UNION ALL
+    SELECT SUM(D.MaxAmount) AS Total_Amount
+    FROM Donations D
+    JOIN User_Service US ON D.Service_ID = US.Service_ID
+    WHERE US.Mobile_No = 9429416061
+) AS TotalSpending;
+
+
+-- Retrieve the total transaction amount made by users other than a specific user, along with their names and mobile numbers
+
+SELECT U.FirstName, U.LastName, U.Mobile_No, Total_Transaction_Amount
+FROM "User" U
+JOIN (
+    SELECT UT.Mobile_No, SUM(TH.TransactionAmount) AS Total_Transaction_Amount
+    FROM User_Transaction UT
+    JOIN Transaction_History TH ON UT.Transaction_ID = TH.Transaction_ID
+    GROUP BY UT.Mobile_No
+) AS UserTransactions ON U.Mobile_No = UserTransactions.Mobile_No
+WHERE U.Mobile_No != 7359077163;
+
+
+-- List all the transactions made by the user along with their status and corresponding rewards earned  
+
+SELECT TH.Transaction_ID, TH.TransactionAmount, TH.PaymentStatus, R.CompanyName, R.Category, R."Discount(%)", R.CashbackRange
+FROM Transaction_History TH
+LEFT JOIN Rewards R ON TH.Transaction_ID = R.Transaction_ID;
+
+
+-- Retrieve the user's most recent transactions to provide them with up-to-date information
+
+SELECT * FROM transaction_history WHERE sender_id =  'aarav.patel01@upi' ORDER BY "Date" DESC LIMIT 5;
+
+
+-- Retrieve the OTT platforms along with the count of users subscribed to each platform, ordered by the number of subscribers in descending order
+
+SELECT o.PlatformName, COUNT(us.Mobile_No) AS SubscriberCount
+FROM OTT o
+LEFT JOIN User_Service us ON o.Service_ID = us.Service_ID
+GROUP BY o.PlatformName
+ORDER BY SubscriberCount DESC;
+
+
+-- Retrieve the broadband providers along with the average speed (in Mbps) offered by each provider and order them by the average speed in descending order
+
+SELECT bb.ProviderName, AVG(bb."Speed(mbps)") AS AvgSpeedMbps
+FROM Broadband bb
+GROUP BY bb.ProviderName
+ORDER BY AvgSpeedMbps DESC;
+
+
+-- List the top 5 users who made the highest transactions
+
+SELECT U.Mobile_No, U.FirstName, U.LastName, SUM(TH.TransactionAmount) AS Total_Transaction_Amount
+FROM "User" U
+JOIN User_Transaction UT ON U.Mobile_No = UT.Mobile_NO
+JOIN Transaction_History TH ON UT.Transaction_ID = TH.Transaction_ID
+GROUP BY U.Mobile_No, U.FirstName, U.LastName
+ORDER BY Total_Transaction_Amount DESC
+LIMIT 5;
+
+
+-- Can you provide a list of users who have friends in their contact list and have successfully completed transactions , Please include details such as the user's name, the method of payment used (bank account or card), transaction details, and any rewards received
+
+SELECT u.FirstName,U.LastName,th.*,r.*
+FROM "User" as u NATURAL JOIN User_Transaction
+NATURAL JOIN Transaction_History as th JOIN Rewards as r ON th.Transaction_ID = r.Transaction_ID;
+
+
+-- Retrieve the top 3 users who have spent the highest amount on OTT services, along with details of the OTT platforms used
+
+SELECT u.Mobile_No, u.FirstName, u.LastName, SUM(o.Amount) AS TotalAmountSpent,o.PlatformName
+FROM "User" u
+NATURAL JOIN User_Service
+NATURAL JOIN Services
+NATURAL JOIN OTT as o
+GROUP BY u.Mobile_No, u.FirstName, u.LastName, o.PlatformName
+ORDER BY TotalAmountSpent DESC
+LIMIT 3;
+
+
+-- Tell payment to which services lead to maximum no of rewards 
+
+SELECT u.Mobile_No, u.FirstName, u.LastName, 
+       th.Transaction_ID, th.TransactionAmount, th."Date", th."Time",
+       r.CompanyName, r.Category, r."Discount(%)", r.CashbackRange, r.Validity
+FROM "User" u
+JOIN User_Transaction ut ON u.Mobile_No = ut.Mobile_No
+JOIN Transaction_History th ON ut.Transaction_ID = th.Transaction_ID
+JOIN Rewards r ON th.Transaction_ID = r.Transaction_ID
+WHERE th.PaymentStatus = 'Successful'
+ORDER BY r."Discount(%)" * th.TransactionAmount DESC
+LIMIT 3;

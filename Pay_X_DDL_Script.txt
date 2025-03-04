@@ -1,0 +1,211 @@
+create schema PayX;
+set search_path to PayX;
+
+create table "User"(
+	Mobile_No bigint,
+	FirstName varchar(50),
+	LastName varchar(50),
+	DOB date,
+	Email varchar(50),
+	PrimaryAccountNo bigint UNIQUE,
+	UPI_ID varchar(50),
+	primary key(Mobile_No)
+)
+
+create table Branch_Details(
+	IFSCcode varchar(20),
+	BankName varchar(50),
+	primary key(IFSCcode)
+)
+
+CREATE TYPE AccType AS ENUM('Current','Savings');
+
+create table Bank(
+	Account_No bigint,
+	UPI_ID varchar(50),
+	Balance bigint,
+	AccountType AccType,
+	Mobile_No bigint,
+	IFSCcode varchar(20),
+	primary key(Account_No),
+	foreign key(IFSCcode) references Branch_Details(IFSCcode),
+	foreign key(Mobile_No) references "User"(Mobile_No)
+)
+
+CREATE TYPE CT AS ENUM('Debit','Credit');
+
+create table Card(
+	Card_No varchar(15),
+	CardType CT,
+	CardHolderName varchar(50),
+	ExpiryDate date,
+	CVV int,
+	Account_No bigint,
+	Mobile_No bigint,
+	primary key(Card_No),
+	foreign key(Account_No) references Bank(Account_No),
+	foreign key(Mobile_No) references "User"(Mobile_No)
+)
+
+create table Contact_Details(
+	FriendMobileNo bigint,
+	UserMobileNo bigint,
+	FriendName varchar(50),
+	primary key(FriendMobileNo,UserMobileNo),
+	foreign key(UserMobileNo) references "User"(Mobile_No)
+)
+
+CREATE TYPE PS AS ENUM('Successful','Failed','Pending');
+
+create table Transaction_History(
+	Transaction_ID bigint,
+	TransactionAmount bigint,
+	Sender_ID varchar(50),
+	Receiver_ID varchar(50),
+	PaymentStatus PS,
+	"Date" date,
+	"Time" time,
+	Category varchar(20),
+	primary key(Transaction_ID)
+)
+
+CREATE TYPE Cat AS ENUM('Discount','Cashback');
+
+create table Rewards(
+	CompanyName varchar(50),
+	Category Cat,
+	"Discount(%)" int,
+	CashbackRange varchar(20),
+	Validity int,
+	Transaction_ID bigint,
+	primary key(Transaction_ID),
+	foreign key(Transaction_ID) references Transaction_History(Transaction_ID)
+)
+
+create table User_Transaction(
+	Mobile_No bigint,
+	Transaction_ID bigint,
+	primary key(Mobile_No,Transaction_ID),
+	foreign key(Mobile_No) references "User"(Mobile_No),
+	foreign key(Transaction_ID) references Transaction_History(Transaction_ID)
+)
+
+CREATE TYPE ST AS ENUM('Hotels','Travels','Donations','Recharge','Utility_Service');
+
+create table Services(
+	Service_ID int,
+	ServiceName varchar(20),
+	ServiceType ST,
+	primary key(Service_ID)
+)
+
+create table User_Service(
+	Mobile_No bigint,
+	Service_ID int,
+	primary key(Mobile_No,Service_ID),
+	foreign key(Mobile_No) references "User"(Mobile_No),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+CREATE TYPE RT AS ENUM('AC','NON-AC');
+create table Hotels(
+	HotelName varchar(50),
+	"State" varchar(20),
+	City varchar(20),
+	Stars int,
+	UserRating decimal(2,1),
+	RoomType RT,
+	Capacity int,
+	PricePerNight int,
+	Service_ID int,
+	primary key(HotelName,State,City,RoomType,Capacity),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+CREATE TYPE TT AS ENUM('Flight','Train','Bus');
+
+create table Travel(
+	"Source" varchar(50),
+	Destination varchar(50),
+	TravelType TT,
+	"Class" varchar(25),
+	"Name" varchar(50),
+	Price int,
+	TypeNo int,
+	Service_ID int,
+	primary key(Source,Destination,TravelType,Class,TypeNo),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+create table Donations(
+	OrganizationName varchar(50),
+	OrganizationType varchar(50),
+	MinAmount int,
+	MaxAmount int,
+	Service_ID int,
+	primary key(OrganizationName),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+CREATE TYPE VQ AS ENUM('480p','720p','1080p','4k');
+CREATE TYPE AQ AS ENUM('Stereo','Dolby');
+
+create table OTT(
+	PlatformName varchar(20),
+	VideoQuality VQ,
+	AudioQuality AQ,
+	No_Of_Devices int,
+	"Validity(months)" int,
+	Amount int,
+	Service_ID int,
+	primary key(PlatformName,VideoQuality,AudioQuality,No_of_Devices,Validity(months)),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+CREATE TYPE CL AS ENUM('Limited','Unlimited');
+create table Mobile(
+	ProviderName varchar(30),
+	"TotalData(gb)" int,
+	MsgLimit int,
+	CallsLimit CL,
+	TalkTime Decimal(5,2),
+	is_gb_per_day boolean,
+	"Validity(days)" int,
+	Amount int,
+	Service_ID int,
+	primary key(ProviderName,TotalData(gb),MsgLimit,CallsLimit,TalkTime,is_gb_day,Validity(days)),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+create table Broadband(
+	ProviderName varchar(20),
+	"Speed(mbps)" int,
+	"Validity(months)" int,
+	Amount int,
+	Service_ID int,
+	primary key(ProviderName, Speed(mbps),Validity(months)),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+CREATE TYPE SerType AS ENUM('Gas','Water','Electricity');
+
+create table Service_Provider(
+	Service_ID int,
+	Service_No int UNIQUE,
+	ServiceType SerType,
+	ProviderName varchar(50),
+	City varchar(50),
+	"State" varchar(50),
+	primary key(Service_ID,Service_No),
+	foreign key(Service_ID) references Services(Service_ID)
+)
+
+create table Bills(
+	Bill_No bigint,
+	BillDate date,
+	DueDate date,
+	Service_No int,
+	BillAmount int,
+	primary key(Bill_No),
+	foreign key(Service_No) references Service_Provider(Service_No)
+)
